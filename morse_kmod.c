@@ -45,6 +45,27 @@ static ssize_t morsedev_read(struct file *filp, char __user * buff,
 
 	printk(KERN_INFO "morse: read from device.\n");
 
+	if ((buff_n_data > 0) && (count > 0)) {
+		size_t len = (buff_wpos > buff_rpos) ?
+		    buff_wpos - buff_rpos : MORSEDEV_BUFLEN - buff_rpos;
+		unsigned long remain;
+
+		if (count < len)
+			len = count;
+
+		remain = copy_to_user(buff, &morsedev_buff[buff_rpos], len);
+		if (remain > 0)
+			printk(KERN_WARNING "morse: %ld bytes remain "
+			       "in the buffer.\n", remain);
+
+		len -= remain;
+		buff_n_data -= len;
+		count -= len;
+		buff_rpos = (buff_rpos + len) % MORSEDEV_BUFLEN;
+		buff += len;
+		n_filled += len;
+	}
+
 	return n_filled;
 }
 
@@ -93,6 +114,19 @@ static ssize_t morsedev_write(struct file *filp, const char __user * buff,
 			printk(KERN_ERR "morse: get_user failed.\n");
 			return -EINVAL;
 		}
+
+		morse_str = char2morse(c, &morse_strlen);
+		if (morse_str == NULL)
+			continue;
+
+		if ((MORSEDEV_BUFLEN - buff_n_data) < morse_strlen)
+			break;
+
+		do {
+			morsedev_buff[buff_wpos] = *morse_str++;
+			buff_wpos = (buff_wpos + 1) % MORSEDEV_BUFLEN;
+			buff_n_data++;
+		} while (--morse_strlen > 0);
 	}
 
 	return n == 0 ? -ENOSPC : n;
