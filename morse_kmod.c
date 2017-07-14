@@ -83,20 +83,84 @@ static inline const unsigned char *char2morse(unsigned char c, size_t * slen)
 		/* 8 */ "---.. ",
 		/* 9 */ "----. ",
 	};
+
+	const unsigned char *morse_alphabet[26] = {
+			/* A */ ".- ",
+			/* B */ "-... ",
+			/* C */ "-.-. ",
+			/* D */ "-.. ",
+			/* E */ ". ",
+			/* F */ "..-. ",
+			/* G */ "--. ",
+			/* H */ ".... ",
+			/* I */ ".. ",
+			/* J */ ".--- ",
+			/* K */ "-.- ",
+			/* L */ ".-.. ",
+			/* M */ "-- ",
+			/* N */ "-. ",
+			/* O */ "--- ",
+			/* P */ ".--. ",
+			/* Q */ "--.- ",
+			/* R */ ".-. ",
+			/* S */ "... ",
+			/* T */ "- ",
+			/* U */ "..- ",
+			/* V */ "...- ",
+			/* W */ ".-- ",
+			/* X */ "-..- ",
+			/* Y */ "-.-- ",
+			/* Z */ "--.. ",
+	};
+
+	const unsigned char *morse_double_quote = ".-..-. ";/* " */
+
+	const unsigned char *morse_symbol[9] = {
+			/* ' */ ".----. ",
+			/* ( */ "-.--. ",
+			/* ) */ "-.--.- ",
+			/* * */ "-..- ",
+			/* + */ ".-.-. ",
+			/* , */ "--..-- ",
+			/* - */ "-....- ",
+			/* . */ ".-.-.- ",
+			/* / */ "-..-. ",
+	};
+
+	const unsigned char *morse_colon = "---... ";/* : */
+	const unsigned char *morse_equal = "-...- ";/* = */
+	const unsigned char *morse_question = "..--.. ";/* ? */
+	const unsigned char *morse_atmark = ".--.-, ";/* @ */
+
 	const unsigned char *s;
 
 	printk(KERN_INFO "morse: write from device.\n");
 
-	if ((c < '0') || (c > '9')) {
+	if ((c >= '0') && (c <= '9')) {// c is '0'-'9'
+			s = morse_nums[c - '0'];
+	} else if ((c >= 'a') && (c <= 'z')) {
+			s = morse_alphabet[c - 'a'];
+	} else if ((c >= 'A') && (c <= 'Z')) {
+			s = morse_alphabet[c - 'A'];
+	} else if (c == '\"') {// c is \"
+			s = morse_double_quote;
+	} else if ((c >= '\'') && (c <= '/')) {// c is \', (, ), *, +, \,, -, ., /
+			s = morse_symbol[c - '\''];
+	} else if (c == ':') {
+			s = morse_colon;
+	} else if (c == '=') {
+			s = morse_equal;
+	} else if (c == '\?') {
+			s = morse_question;
+	} else if (c == '@') {
+			s = morse_atmark;
+	} else {
 		printk(KERN_INFO "morse: skip a unsupported "
 		       "character '%c'\n", c);
-		*slen = 0;
-		return NULL;
+		s = NULL;
 	}
 
-	s = morse_nums[c - '0'];
-	*slen = strlen(s);
-
+	*slen = (s != NULL) ? strlen(s) : 0;
 	return s;
 }
 
