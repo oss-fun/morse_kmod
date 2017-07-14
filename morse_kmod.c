@@ -25,6 +25,7 @@ static unsigned int buff_rpos;
 static unsigned int buff_wpos;
 /* bytes of data stored in the buffer */
 static size_t buff_n_data;
+static DECLARE_WAIT_QUEUE_HEAD(wq);
 
 static int morsedev_open(struct inode *inode, struct file *filp)
 {
@@ -42,29 +43,32 @@ static ssize_t morsedev_read(struct file *filp, char __user * buff,
 			     size_t count, loff_t * offp)
 {
 	size_t n_filled = 0;
+	size_t len;
+	unsigned long remain;
 
 	printk(KERN_INFO "morse: read from device.\n");
 
-	if ((buff_n_data > 0) && (count > 0)) {
-		size_t len = (buff_wpos > buff_rpos) ?
-		    buff_wpos - buff_rpos : MORSEDEV_BUFLEN - buff_rpos;
-		unsigned long remain;
+	if (count <= 0)
+		return 0;
 
-		if (count < len)
-			len = count;
+	wait_event_interruptible(wq, buff_n_data > 0);
 
-		remain = copy_to_user(buff, &morsedev_buff[buff_rpos], len);
-		if (remain > 0)
-			printk(KERN_WARNING "morse: %ld bytes remain "
-			       "in the buffer.\n", remain);
+	len = (buff_wpos > buff_rpos) ?
+	    buff_wpos - buff_rpos : MORSEDEV_BUFLEN - buff_rpos;
+	if (count < len)
+		len = count;
 
-		len -= remain;
-		buff_n_data -= len;
-		count -= len;
-		buff_rpos = (buff_rpos + len) % MORSEDEV_BUFLEN;
-		buff += len;
-		n_filled += len;
-	}
+	remain = copy_to_user(buff, &morsedev_buff[buff_rpos], len);
+	if (remain > 0)
+		printk(KERN_WARNING "morse: %ld bytes remain "
+		       "in the buffer.\n", remain);
+
+	len -= remain;
+	buff_n_data -= len;
+	count -= len;
+	buff_rpos = (buff_rpos + len) % MORSEDEV_BUFLEN;
+	buff += len;
+	n_filled += len;
 
 	return n_filled;
 }
@@ -192,6 +196,8 @@ static ssize_t morsedev_write(struct file *filp, const char __user * buff,
 			buff_n_data++;
 		} while (--morse_strlen > 0);
 	}
+
+	wake_up_interruptible(&wq);
 
 	return n == 0 ? -ENOSPC : n;
 }
